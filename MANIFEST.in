@@ -1,0 +1,5 @@
+include *.py
+include README.md
+prune tests/
+exclude .gitignore
+exclude MANIFEST.in
