@@ -1,6 +1,6 @@
 <!-- markdownlint-disable -->
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/chloris-app-sdk/src/chloris_app_sdk/utils.py#L0"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/utils.py#L0"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 # <kbd>module</kbd> `chloris_app_sdk.utils`
 General utility functions.  
@@ -8,7 +8,7 @@ General utility functions.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/chloris-app-sdk/src/chloris_app_sdk/utils.py#L8"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/utils.py#L8"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ## <kbd>function</kbd> `is_token_expired`
 
@@ -34,7 +34,7 @@ Check if a JWT token is expired without validating it.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/chloris-app-sdk/src/chloris_app_sdk/utils.py#L33"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/utils.py#L33"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ## <kbd>function</kbd> `decode_jwt`
 
@@ -59,7 +59,7 @@ Decode a JWT token without validating it and return the payload as a dictionary.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/chloris-app-sdk/src/chloris_app_sdk/utils.py#L50"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/utils.py#L50"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ## <kbd>function</kbd> `to_tco2e`
 
