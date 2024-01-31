@@ -9,8 +9,9 @@ from datetime import datetime, timedelta, timezone
 from botocore.exceptions import ClientError
 from urllib3 import PoolManager
 import boto3
-from tempfile import NamedTemporaryFile
 from .utils import is_token_expired
+
+from botocore.config import Config
 
 
 class ChlorisAppClient:
@@ -145,7 +146,7 @@ class ChlorisAppClient:
         Returns: The boto3 cognito idp client.
         """
         if self._cognito_idp_client is None:
-            self._cognito_idp_client = boto3.client("cognito-idp", region_name=self._aws_resources["awsRegion"])
+            self._cognito_idp_client = boto3.client("cognito-idp", config=Config(region_name=self._aws_resources["awsRegion"]))
         return self._cognito_idp_client
 
     def _get_s3_bucket_resource(self) -> Any:
@@ -178,8 +179,9 @@ class ChlorisAppClient:
         Returns: The STS temporary credentials.
 
         """
+
         if self._cognito_identity_client is None:
-            self._cognito_identity_client = boto3.client("cognito-identity")
+            self._cognito_identity_client = boto3.client("cognito-identity", config=Config(region_name=self._aws_resources["awsRegion"]))
         # check if the credentials are expired
         if self._sts_credentials_expired():
             self._sts_credentials = None
