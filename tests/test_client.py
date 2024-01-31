@@ -6,6 +6,7 @@ import os
 
 # workaround to import from src directory
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 from chloris_app_sdk import ChlorisAppClient
@@ -20,8 +21,6 @@ TEST_API = 'https://app-dev.chloris.earth/api/'
 def test_client() -> None:
     # requires CHLORIS_REFRESH_TOKEN env variable to be set, makes real calls to AWS
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
-    access_token = client._get_access_token()
-    assert access_token is not None
     id_token = client._get_id_token()
     assert id_token is not None
     creds = client._get_sts_temporary_credentials()
@@ -38,7 +37,8 @@ def test_client() -> None:
         boundary_path = client.upload_boundary_geojson(json.load(f))
     assert boundary_path is not None
     # test geojson boundary upload succeeds (remote url)
-    boundary_path = client.upload_boundary_geojson("https://raw.githubusercontent.com/chloris-geospatial/chloris-app-sdk/main/tests/test_resources/test_small_site.geojson")
+    boundary_path = client.upload_boundary_geojson(
+        "https://raw.githubusercontent.com/chloris-geospatial/chloris-app-sdk/main/tests/test_resources/test_small_site.geojson")
     assert boundary_path is not None
 
     # test boundary upload succeeds
@@ -53,27 +53,25 @@ def test_client() -> None:
         label="site 1",
         boundary_path=os.path.join(test_resources_path, "test_small_site.geojson"),
         description="test description",
-        tags = ['test'],
+        tags=['test'],
         dryrun=True,
-        notify = False,
+        notify=False,
         period_change_start_year=2000,
         period_change_end_year=2023
     )
     assert reporting_unit.get('reportingUnitId') is not None
 
 
-
 def test_list_active_sites():
-
-    client = ChlorisAppClient (TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
 
     reporting_units = client.list_active_sites()
 
     assert len(reporting_units) > 0
 
-def test_get_reporting_unit():
 
-    client = ChlorisAppClient (TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+def test_get_reporting_unit():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
 
     reporting_unit_id = '018a7b00-6d6f-79bd-8c2f-14624ead55c1'
 
@@ -85,3 +83,11 @@ def test_get_reporting_unit():
     assert reporting_unit_entry['annualYears'] is not None
     # assert reporting_unit_entry['downloads'] is not None
 
+
+def test__get_sts_temporary_credentials():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    creds = client._get_sts_temporary_credentials()
+
+    assert creds is not None
+    assert client._get_id_token() is not None

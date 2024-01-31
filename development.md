@@ -38,7 +38,7 @@ python -c "from chloris_app_sdk import ChlorisAppClient; print(ChlorisAppClient)
 
 
 # upload the package to pypi
-twine upload --skit-existing dist/*
+twine upload --skip-existing dist/*
 ```
 
 ### Updating the API documentation
