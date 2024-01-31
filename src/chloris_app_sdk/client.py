@@ -2,7 +2,7 @@
 import os
 import uuid
 from time import sleep
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -57,6 +57,8 @@ class ChlorisAppClient:
             self.api_endpoint = os.environ.get("CHLORIS_API_ENDPOINT")
         if self.api_endpoint is None:
             self.api_endpoint = "https://app.chloris.earth/api/"
+        if not self.api_endpoint.endswith("/"):
+            self.api_endpoint += "/"
         self.data_path = self.api_endpoint.replace("/api/", "/data/")
         if self.__id_token is None:
             self.__id_token = os.environ.get("CHLORIS_ID_TOKEN")
@@ -74,7 +76,6 @@ class ChlorisAppClient:
         # Ensure we have at least the id_token or refresh_token
         if self.__id_token is None and self.__refresh_token is None:
             raise ValueError("You must provide either an id_token or refresh_token. See help at: https://app.chloris.earth/docs/")
-
         self._get_api_info()
 
         # attempt to get access token from refresh token
@@ -83,7 +84,7 @@ class ChlorisAppClient:
 
     def _get_api_info(self) -> None:
         """Get the environment-specific info for the Chloris API"""
-        response = self._http_pool.request('GET', self.api_endpoint + '/info')
+        response = self._http_pool.request('GET', self.api_endpoint + 'info')
         if response.status != 200:
             raise Exception("Failed to retrieve info from Chloris API")
         response_json = json.loads(response.data.decode('utf-8'))
@@ -185,7 +186,7 @@ class ChlorisAppClient:
         # get new credentials if needed
         if self._sts_credentials is None:
             try:
-                logins = {f"""cognito-idp.{self._aws_resources['region']}.amazonaws.com/{self._aws_resources['awsUserPoolsId']}""": self._get_id_token()}
+                logins = {f"""cognito-idp.{self._aws_resources['awsRegion']}.amazonaws.com/{self._aws_resources['awsUserPoolId']}""": self._get_id_token()}
                 # Get the identity ID associated with the Cognito access token.
                 response = self._cognito_identity_client.get_id(IdentityPoolId=self._aws_resources["awsCognitoIdentityPoolId"], Logins=logins)
                 identity_id = response["IdentityId"]
@@ -247,7 +248,7 @@ class ChlorisAppClient:
     def _sts_credentials_expired(self):
         return self._sts_credentials is not None and datetime.now(timezone.utc) > self._sts_credentials.get("Expiration", 0) - timedelta(minutes=10)
 
-    def upload_boundary_geojson(self, geojson: Union[Any], exclude_geometry_path: str = None) -> str:
+    def upload_boundary_geojson(self, geojson: Union[Dict[str, Any], str, os.PathLike], exclude_geometry_path: str = None) -> str:
         """
         Upload a geojson boundary to the Chloris S3 bucket, and wait for it to be normalized.
           Compared to `upload_boundary_file()`, this function is more relaxed in sparseness
@@ -257,35 +258,62 @@ class ChlorisAppClient:
          by uploading it first, then passing the result as `exclude_geometry_path`.
 
         Args:
-            geojson: The geospatial boundary geojson, as a dictionary.
+            geojson: The geospatial boundary geojson, as a dictionary, local file path, or remote https url.
             exclude_geometry_path: The S3 path to a geometry to exclude from the boundary.
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
 
         """
+        # Automatically determine whether the geojson param is a dictionary, local file path, or remote https url.
+        _geojson = None
+        _geojson_path = None
+        if isinstance(geojson, dict):
+            _geojson = geojson
+        if _geojson is None:
+            if isinstance(geojson, str):
+                if geojson.startswith("http://"):
+                    raise ValueError("http urls not allowed when uploading from a remote server, please use https")
+                if geojson.startswith('https://'):
+                    _geojson_path = geojson
+        if _geojson is None and _geojson_path is None:
+            with open(geojson, 'r') as f:
+                _geojson = json.load(f)
+        if _geojson is None and _geojson_path is None:
+            raise ValueError("Invalid geojson provided")
+        # estimate the file size in MB of _geojson
+        _geojson_size = len(json.dumps(_geojson)) / 1024 / 1024
+        if _geojson_size > 10:
+            raise ValueError("Geojson must be less than 10 MB for this upload method. Use upload_boundary_file() for larger files.")
+
+        if exclude_geometry_path and not exclude_geometry_path.startswith("s3://"):
+            raise ValueError("exclude_geometry_path must be an S3 path")
+
         # Use `POST /api/boundary` endpoint to normalize the boundary
         response = self._http_pool.request(
-            "PUT",
-            self.api_endpoint + "reportingUnit",
+            "POST",
+            self.api_endpoint + "boundary",
             headers={
                 "Content-Type": "application/json",
                 "Authorization": "Bearer " + self._get_id_token(),
             },
             body=json.dumps(
                 {
-                    "identityId": self._get_sts_temporary_credentials()["IdentityId"],
+                    "organizationId": self.organization_id,
                     "uploadId": str(uuid.uuid4()),
-                    "geojson": geojson,
-                    "strict": False,
+                    "geojson": _geojson,
+                    "geojsonPath": _geojson_path,
                     "excludeGeometryPath": exclude_geometry_path,
                 }
             ),
         )
         if response.status != 200:
-            raise Exception(f"Failed to create or update reporting unit: {response.status} {response.data.decode('utf-8')}")
-        # return the reporting unit id
-        return json.loads(response.data.decode("utf-8"))["reportingUnitId"]
+            raise Exception(f"Failed to upload boundary: {response.status} {response.data.decode('utf-8')}")
+        # return the normalized boundary path
+        if "boundaryPath" not in json.loads(response.data.decode("utf-8")):
+            print(response.data.decode("utf-8"))
+            exit(1)
+        return json.loads(response.data.decode("utf-8"))["boundaryPath"]
 
     def upload_boundary_file(self, file: Union[str, os.PathLike, Sequence[str], Sequence[os.PathLike]], exclude_geometry_path: str = None) -> str:
         """
@@ -484,7 +512,7 @@ class ChlorisAppClient:
         response_json = json.loads(response.data.decode("utf-8"))
 
         reporting_units = []
-        for reporting_unit in response_json.get("reportingUnits", []):
+        for reporting_unit in response_json:
             # Ensure "periodChangeStartYear" and "periodChangeEndYear" are integers
             if isinstance(reporting_unit.get("periodChangeStartYear"), str):
                 reporting_unit["periodChangeStartYear"] = int(reporting_unit["periodChangeStartYear"])
@@ -535,7 +563,6 @@ class ChlorisAppClient:
             raise ValueError("Analysis not completed")
 
         data_path = self._get_data_path(reporting_unit_entry)
-
         response = self._http_pool.request(
             "GET",
             data_path + "stats.json",
@@ -551,7 +578,9 @@ class ChlorisAppClient:
     def _get_data_path(self, reporting_unit_entry: Mapping[str, Any]) -> str:
         data_path = reporting_unit_entry.get("dataPath").rstrip("/") + "/"
         if data_path is None:
-            data_path = self.data_path + f"{reporting_unit_entry['reportingUnitId']}/"
+            data_path = '/'.join([self.data_path.rstrip('/'), reporting_unit_entry['organizationId'], reporting_unit_entry['reportingUnitId'], ''])
+        if data_path.startswith("s3://"):
+            data_path = data_path.replace("s3://chloris-app-data/data/", self.data_path)
         return data_path
 
     def get_reporting_unit_layers_config(self, reporting_unit_entry: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -568,10 +597,9 @@ class ChlorisAppClient:
             raise ValueError("Analysis not completed")
 
         data_path = self._get_data_path(reporting_unit_entry)
-
         response = self._http_pool.request(
             "GET",
-            data_path + "layersConfig.json",
+            data_path + "layers.json",
             headers={
                 "Content-Type": "application/json",
                 "Authorization": "Bearer " + self._get_id_token(),
@@ -620,24 +648,25 @@ class ChlorisAppClient:
                     boundary_path: str,
                     tags: Sequence[str] = None,
                     description: str = None,
-                    control_boundary_path: str = None,
+                    control_boundary_path: Optional[str] = None,
                     notify: Optional[bool] = True,
                     period_change_start_year: Optional[int] = None,
                     period_change_end_year: Optional[int] = None,
+                    **kwargs
                     ) -> Mapping[str, Any]:
         """A high-level function to submit a site to the Chloris App. Automatically chooses the best method to upload the boundary (geojson or S3 multipart upload).
 
         Args:
             label: The label for the site.
-            boundary_path: The path to the boundary file to upload. May be a local file or a https url remove server.
             tags: The tags for the site.
             description: The description for the site.
-            control_boundary_path: The path to the control boundary file to upload. May be local or a https url on a remote server.
+            boundary_path: The path to the boundary file to upload. Either a local file path or a https url to a geojson file on a remote server.
+            control_boundary_path: The path to the control boundary file to upload. Either a local file path or a https url to a geojson file on a remote server.
             notify: Whether to send email notifications when the site is ready.
             period_change_start_year: The start of the period of interest
             period_change_end_year: The end of the period of interest (inclusive)
 
-        Returns: The new site entry.
+        Returns: The new reporting unit entry.
         """
 
         # First we upload the primary boundary, then the control boundary (if provided), then we submit the site.
@@ -646,35 +675,51 @@ class ChlorisAppClient:
         _boundary_path = None
         _control_boundary_path = None
 
-        if boundary_path.startswith("http://") or control_boundary_path.startswith("http://"):
+        if (
+            boundary_path.startswith("http://") or
+            (control_boundary_path is not None and control_boundary_path.startswith("http://"))
+        ):
             raise ValueError("http urls not allowed when uploading from a remote server, please use https")
 
         if boundary_path.lower().startswith("https://"):
             if boundary_path.lower().endswith(".geojson") or boundary_path.lower().endswith(".json"):
-                _boundary_path = boundary_path
+                _boundary_path = self.upload_boundary_geojson(boundary_path)
             else:
                 raise ValueError("Only geojson files are supported when submitting sites from a remote url")
-        if boundary_path.lower().startswith("s3://"):
-            _boundary_path = boundary_path
+        else:
+            if boundary_path.lower().endswith(".geojson") or boundary_path.lower().endswith(".json"):
+                _boundary_path = self.upload_boundary_geojson(boundary_path)
+            else:
+                _boundary_path = self.upload_boundary_file(boundary_path)
+        if control_boundary_path is not None:
+            if control_boundary_path.lower().startswith("https://"):
+                if control_boundary_path.lower().endswith(".geojson") or control_boundary_path.lower().endswith(".json"):
+                    _control_boundary_path = control_boundary_path
+                else:
+                    raise ValueError("Only geojson files are supported when submitting sites from a remote url")
+            else:
+                if control_boundary_path.lower().endswith(".geojson") or control_boundary_path.lower().endswith(".json"):
+                    _control_boundary_path = self.upload_boundary_geojson(control_boundary_path)
+                else:
+                    _control_boundary_path = self.upload_boundary_file(control_boundary_path)
 
-        # Try to convert small local files to geojson
-        if (_boundary_path is None and
-            os.path.exists(boundary_path) and
-            not (boundary_path.lower().endswith(".geojson") or boundary_path.lower().endswith(".json")) and
-            os.path.getsize(boundary_path) < 10 * 1024 * 1024
-        ):
-            try:
-                import geopandas as gpd
-                with NamedTemporaryFile(suffix=".geojson") as tmp:
-                    gdf = gpd.read_file(boundary_path)
-                    gdf.to_file(tmp.name, driver="GeoJSON")
-                    if os.path.getsize(tmp.name) < 10 * 1024 * 1024:
-                        _boundary_path = tmp.name
-            except Exception:
-                # do nothing, we'll try to upload the file in its original format
-                pass
-        if _boundary_path is not None:
-            # upload the boundary file directly
-            pass
-        if _boundary_path:
-            pass
+        # ensure we have uploaded the boundaries appropriately
+        if _boundary_path is None:
+            raise ValueError("Failed to upload boundary")
+        if control_boundary_path is not None and _control_boundary_path is None:
+            raise ValueError("Failed to upload control boundary")
+
+        return self.put_reporting_unit(
+            {
+                "organizationId": self.organization_id,
+                "label": label,
+                "description": description,
+                "tags": tags,
+                "boundaryPath": _boundary_path,
+                "controlBoundaryPath": _control_boundary_path,
+                "notify": notify,
+                "periodChangeStartYear": period_change_start_year,
+                "periodChangeEndYear": period_change_end_year,
+                **kwargs
+            }
+        )
