@@ -275,6 +275,8 @@ class ChlorisAppClient:
             The S3 path to the normalized boundary, to be used when submitting a new site.
 
         """
+        if not isinstance(geojson_path, str):
+            geojson_path = str(geojson_path)
         if geojson_path.startswith("http://"):
             raise ValueError("http urls not allowed when uploading from a remote server, please use https")
 
@@ -309,7 +311,7 @@ class ChlorisAppClient:
 
 
 
-    def _upload_boundary_file(self, file: Union[str, os.PathLike, Sequence[str], Sequence[os.PathLike]], exclude_geometry_path: str = None) -> str:
+    def _upload_boundary_file(self, file: Union[str, os.PathLike], exclude_geometry_path: str = None) -> str:
         """
         Upload a geospatial boundary to the Chloris S3 bucket, and wait for it to be normalized.
 
@@ -317,7 +319,7 @@ class ChlorisAppClient:
           it can upload, but more applies stricter sparseness and complexity limits.
 
         Args:
-            file: The geospatial boundary file to upload, or for shapefiles a list of the [shp, dbf, shx, prj, ...] files.
+            file: The geospatial boundary file to upload, for shapefile, just the path to the .shp.
             exclude_geometry_path: The S3 path to a geometry to exclude from the boundary.
 
         Returns:
@@ -339,14 +341,17 @@ class ChlorisAppClient:
         #    as it attempts fix some common polygon issues and reading from certain
         #    formats (such as KML) can produce visual artifacts.
 
-        if isinstance(file, str) or isinstance(file, os.PathLike):
-            files = [file]
+        if not isinstance(file, str):
+            file = str(file)
+        if file.endswith(".shp"):
+            files =[]
+            # if the file is a shapefile, upload all the files in the shapefile
+            for shp_ext in [".dbf", ".prj", ".shx"]:
+                if os.path.exists(file.replace(".shp", shp_ext)):
+                    files.append(file.replace(".shp", shp_ext))
+            files.append(file)
         else:
-            files = file
-
-        # if the file is a multi-file shp, upload the .shp file after all the others have finished.
-        if len(files) > 1:
-            files = list(sorted(files, key=lambda f: f.endswith(".shp")))
+            files = [file]
 
         # ensure that all the files exist
         for file in files:
