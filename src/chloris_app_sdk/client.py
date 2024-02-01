@@ -43,6 +43,7 @@ class ChlorisAppClient:
         self._cognito_idp_client = None
         self._cognito_identity_client = None
         self._s3_bucket_resource = None
+        self._s3_client = None
 
         # parameter parsing
         self.organization_id = organization_id
@@ -149,6 +150,16 @@ class ChlorisAppClient:
             self._cognito_idp_client = boto3.client("cognito-idp", config=Config(region_name=self._aws_resources["awsRegion"]))
         return self._cognito_idp_client
 
+    def _get_s3_client(self ) -> Any:
+        """
+        Get the boto3 s3 client, creating it if needed.
+
+        Returns: The boto3 s3 client.
+        """
+        if self._s3_client is None:
+            self._s3_client = boto3.client("s3", config=Config(region_name=self._aws_resources["awsRegion"]))
+        return self._s3_client
+
     def _get_s3_bucket_resource(self) -> Any:
         """
         Get the boto3 s3 bucket resource, creating it if needed.
@@ -243,55 +254,34 @@ class ChlorisAppClient:
 
     def _get_object_metadata(self, key: str) -> Optional[Mapping[str, str]]:
         # type hint for the boto3 S3 object
-        obj = self._get_s3_bucket_resource().Object(key)
-        obj.load()
-        return obj.metadata
+        obj = self._get_s3_client().head_object(Bucket=self._aws_resources["awsUserFilesS3Bucket"], Key=key)
+        return obj.get("Metadata")
 
     def _sts_credentials_expired(self):
         return self._sts_credentials is not None and datetime.now(timezone.utc) > self._sts_credentials.get("Expiration", 0) - timedelta(minutes=10)
 
-    def upload_boundary_geojson(self, geojson: Union[Dict[str, Any], str, os.PathLike], exclude_geometry_path: str = None) -> str:
+    def _upload_boundary_remote_geojson(self, geojson_path: Union[str, os.PathLike], exclude_geometry_path: str = None) -> str:
         """
-        Upload a geojson boundary to the Chloris S3 bucket, and wait for it to be normalized.
-          Compared to `upload_boundary_file()`, this function is more relaxed in sparseness
-          and complexity limits, but is limited to geojson.
+        Upload a geojson boundary to the Chloris S3 bucket from a remote server or S3 bucket, and wait for it to be normalized.
 
         If the boundary is a control site, we recommend you exclude the primary geometry's area
-         by uploading it first, then passing the result as `exclude_geometry_path`.
+         by uploading it first, then passing the normalized result as `exclude_geometry_path`.
 
         Args:
-            geojson: The geospatial boundary geojson, as a dictionary, local file path, or remote https url.
+            geojson_path: The geospatial boundary geojson, as a dictionary, local file path, or remote https url.
             exclude_geometry_path: The S3 path to a geometry to exclude from the boundary.
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
 
         """
-        # Automatically determine whether the geojson param is a dictionary, local file path, or remote https url.
-        _geojson = None
-        _geojson_path = None
-        if isinstance(geojson, dict):
-            _geojson = geojson
-        if _geojson is None:
-            if isinstance(geojson, str):
-                if geojson.startswith("http://"):
-                    raise ValueError("http urls not allowed when uploading from a remote server, please use https")
-                if geojson.startswith('https://'):
-                    _geojson_path = geojson
-        if _geojson is None and _geojson_path is None:
-            with open(geojson, 'r') as f:
-                _geojson = json.load(f)
-        if _geojson is None and _geojson_path is None:
-            raise ValueError("Invalid geojson provided")
-        # estimate the file size in MB of _geojson
-        _geojson_size = len(json.dumps(_geojson)) / 1024 / 1024
-        if _geojson_size > 10:
-            raise ValueError("Geojson must be less than 10 MB for this upload method. Use upload_boundary_file() for larger files.")
+        if geojson_path.startswith("http://"):
+            raise ValueError("http urls not allowed when uploading from a remote server, please use https")
 
         if exclude_geometry_path and not exclude_geometry_path.startswith("s3://"):
-            raise ValueError("exclude_geometry_path must be an S3 path")
-
-        # Use `POST /api/boundary` endpoint to normalize the boundary
+            raise ValueError("exclude_geometry_path must be an previously normalized S3 path")
+        upload_id = str(uuid.uuid4())  # generate random id for this upload
+        # Use `POST /api/boundary` endpoint to submit the boundary for normalization.
         response = self._http_pool.request(
             "POST",
             self.api_endpoint + "boundary",
@@ -302,26 +292,28 @@ class ChlorisAppClient:
             body=json.dumps(
                 {
                     "organizationId": self.organization_id,
-                    "uploadId": str(uuid.uuid4()),
-                    "geojson": _geojson,
-                    "geojsonPath": _geojson_path,
+                    "uploadId": upload_id,
+                    "uploadPath": geojson_path,
                     "excludeGeometryPath": exclude_geometry_path,
                 }
             ),
         )
         if response.status != 200:
-            raise Exception(f"Failed to upload boundary: {response.status} {response.data.decode('utf-8')}")
-        # return the normalized boundary path
-        if "boundaryPath" not in json.loads(response.data.decode("utf-8")):
-            print(response.data.decode("utf-8"))
-            exit(1)
-        return json.loads(response.data.decode("utf-8"))["boundaryPath"]
+            raise Exception(f"Failed to submit boundary for analysis: {response.status} {response.data.decode('utf-8')}")
 
-    def upload_boundary_file(self, file: Union[str, os.PathLike, Sequence[str], Sequence[os.PathLike]], exclude_geometry_path: str = None) -> str:
+        # Poll S3 with exponential backoff up to 15 minutes for the boundary to be normalized
+        boundary_path = self._wait_for_boundary_normalization(upload_id)
+        if boundary_path is None:
+            raise ValueError("Could not process your file in the time allowed, please simplify your boundary and try again.")
+        return boundary_path
+
+
+
+    def _upload_boundary_file(self, file: Union[str, os.PathLike, Sequence[str], Sequence[os.PathLike]], exclude_geometry_path: str = None) -> str:
         """
         Upload a geospatial boundary to the Chloris S3 bucket, and wait for it to be normalized.
 
-          Compared to `upload_boundary_geojson()`, this function is more flexible in the types of files
+          Compared to `_upload_boundary_remote_geojson()`, this function is more flexible in the types of files
           it can upload, but more applies stricter sparseness and complexity limits.
 
         Args:
@@ -336,10 +328,9 @@ class ChlorisAppClient:
         """
 
         # Here are the steps we take to upload a boundary:
-        # 1. Upload the boundary file(s) to the user data bucket under `uploads/`,
-        #    which will automatically trigger our system to normalize it in the background.
-        # 2. As the normalization is performed in a sandboxed environment which for security
-        #    reasons we can't talk to directly, we must poll for the normalized file.
+        # 1. Upload the boundary file(s) to the user data bucket under `apiUploads/`
+        # 2. Call the `POST /api/boundary` endpoint to submit the boundary for normalization.
+        # 2. Wait for the boundary to be normalized by polling S3 with exponential backoff up to 15 minutes.
         # 3. Return the path to the normalized boundary or, in the event that there was a
         #    specific issue with the boundary, the error message in the S3 metadata.
         # 4. (optional, after this function returns) Download the normalized boundary using
@@ -363,23 +354,53 @@ class ChlorisAppClient:
                 raise ValueError(f"File does not exist: {file}")
 
         upload_id = str(uuid.uuid4())  # generate random id for this upload
-        boundary_key = f"protected/{self._get_sts_temporary_credentials()['IdentityId']}/uploads/{upload_id}.geojson"
+        identity_id = self._get_sts_temporary_credentials()['IdentityId']
 
-        metadata = {"upload-id": upload_id, "organization-id": self.organization_id, "limit-km2": "30000"}
+        # metadata just for traceability
+        metadata = {"upload-id": upload_id, "organization-id": self.organization_id}
 
-        if exclude_geometry_path:
-            metadata["exclude-geojson"] = exclude_geometry_path
+        upload_key = None
         for file in files:
             # split the file extensions (.aux.xml)
             file_ext = ".".join(os.path.basename(file).split(".")[1:])
-            upload_key = f"private/{self._get_sts_temporary_credentials()['IdentityId']}/uploads/{upload_id}.{file_ext}"
+            upload_key = f"private/{identity_id}/apiUploads/{upload_id}.{file_ext}"
 
             # upload the file
             self._upload_file(upload_key, file_path=file, metadata=metadata)
-        # Poll every 3 seconds, timeout after ~185 seconds (the lambda is limited to 180, but we give a little padding for cold start)
-        polling_interval = 3
-        time_remaining = 185
-        for _ in range(0, time_remaining, polling_interval):
+
+        # Initiate the normalization process
+        response = self._http_pool.request(
+            "POST",
+            self.api_endpoint + "boundary",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + self._get_id_token(),
+            },
+            body=json.dumps(
+                {
+                    "organizationId": self.organization_id,
+                    "uploadId": upload_id,
+                    "uploadPath": f"s3://{self._aws_resources['awsUserFilesS3Bucket']}/{upload_key}",
+                    "excludeGeometryPath": exclude_geometry_path,
+                }
+            ),
+        )
+
+        if response.status != 200:
+            raise Exception(f"Failed to initiate boundary normalization: {response.status} {response.data.decode('utf-8')}")
+
+        boundary_path = self._wait_for_boundary_normalization(upload_id)
+        if boundary_path is None:
+            raise ValueError("Could not process your file in the time allowed, please simplify your boundary and try again.")
+        return boundary_path
+
+    def _wait_for_boundary_normalization(self, upload_id: str) -> Optional[str]:
+        identity_id = self._get_sts_temporary_credentials()["IdentityId"]
+        boundary_key = f"protected/{identity_id}/uploads/{upload_id}.geojson"
+        # Poll S3 with exponential backoff up to 15 minutes for the boundary to be normalized
+        i = 0
+        time_remaining = 15 * 60  # 15 minutes
+        while True:
             # check if the boundary has been normalized
             metadata = None
             try:
@@ -389,15 +410,17 @@ class ChlorisAppClient:
                 if ex.response["Error"]["Code"] not in ["404", "403"]:
                     raise ex
 
-            if metadata:
+            if metadata is not None:
                 if metadata.get("error"):
                     raise ValueError(metadata["error"])
                 # upload was successful
                 return f"s3://{self._aws_resources['awsUserFilesS3Bucket']}/{boundary_key}"
             else:
-                sleep(polling_interval)
-        # timeout
-        raise ValueError("Could not process your file in the time allowed, please simplify your boundary and try again.")
+                delay = 5 * (1.3 ** i)  # exponential backoff
+                time_remaining -= delay
+                if time_remaining <= 0:
+                    break
+                sleep(delay)
 
     def put_reporting_unit(self, reporting_unit_entry: Mapping[str, Any]) -> Mapping[str, Any]:
         """
@@ -673,7 +696,7 @@ class ChlorisAppClient:
 
         # First we upload the primary boundary, then the control boundary (if provided), then we submit the site.
 
-        # these are the paths to the non-normalized boundaries
+        # these are the paths to the normalized boundaries
         _boundary_path = None
         _control_boundary_path = None
 
@@ -684,15 +707,9 @@ class ChlorisAppClient:
             raise ValueError("http urls not allowed when uploading from a remote server, please use https")
 
         if boundary_path.lower().startswith("https://"):
-            if boundary_path.lower().endswith(".geojson") or boundary_path.lower().endswith(".json"):
-                _boundary_path = self.upload_boundary_geojson(boundary_path)
-            else:
-                raise ValueError("Only geojson files are supported when submitting sites from a remote url")
+            _boundary_path = self._upload_boundary_remote_geojson(boundary_path)
         else:
-            if boundary_path.lower().endswith(".geojson") or boundary_path.lower().endswith(".json"):
-                _boundary_path = self.upload_boundary_geojson(boundary_path)
-            else:
-                _boundary_path = self.upload_boundary_file(boundary_path)
+            _boundary_path = self._upload_boundary_file(boundary_path)
         if control_boundary_path is not None:
             if control_boundary_path.lower().startswith("https://"):
                 if control_boundary_path.lower().endswith(".geojson") or control_boundary_path.lower().endswith(".json"):
@@ -700,10 +717,10 @@ class ChlorisAppClient:
                 else:
                     raise ValueError("Only geojson files are supported when submitting sites from a remote url")
             else:
-                if control_boundary_path.lower().endswith(".geojson") or control_boundary_path.lower().endswith(".json"):
-                    _control_boundary_path = self.upload_boundary_geojson(control_boundary_path)
+                if boundary_path.lower().startswith("https://"):
+                    _control_boundary_path = self._upload_boundary_remote_geojson(control_boundary_path, exclude_geometry_path=_boundary_path)
                 else:
-                    _control_boundary_path = self.upload_boundary_file(control_boundary_path)
+                    _control_boundary_path = self._upload_boundary_file(control_boundary_path, exclude_geometry_path=_boundary_path)
 
         # ensure we have uploaded the boundaries appropriately
         if _boundary_path is None:

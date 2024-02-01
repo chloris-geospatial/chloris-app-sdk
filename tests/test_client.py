@@ -29,29 +29,23 @@ def test_client() -> None:
     test_file = f"protected/{creds['IdentityId']}/{random.randint(0, 1000000)}_test.txt"
     client._upload_file(key=test_file, body="test")
     client._get_object_metadata(key=test_file)
-    # test geojson boundary upload succeeds (local path)
-    boundary_path = client.upload_boundary_geojson(os.path.join(test_resources_path, "test_small_site.geojson"))
-    assert boundary_path is not None
-    # test geojson boundary upload succeeds (local file)
-    with open(os.path.join(test_resources_path, "test_small_site.geojson"), "r") as f:
-        boundary_path = client.upload_boundary_geojson(json.load(f))
-    assert boundary_path is not None
     # test geojson boundary upload succeeds (remote url)
-    boundary_path = client.upload_boundary_geojson(
+    boundary_path = client._upload_boundary_remote_geojson(
         "https://raw.githubusercontent.com/chloris-geospatial/chloris-app-sdk/main/tests/test_resources/test_small_site.geojson")
     assert boundary_path is not None
 
     # test boundary upload succeeds
-    boundary_path = client.upload_boundary_file(os.path.join(test_resources_path, "test_small_site.geojson"))
+    boundary_path = client._upload_boundary_file(os.path.join(test_resources_path, "test_small_site.geojson"))
     assert boundary_path is not None
     # test boundary upload fails (too large)
     with pytest.raises(Exception):
-        client.upload_boundary_file(os.path.join(test_resources_path, "test_too_big_site.geojson"))
+        client._upload_boundary_file(os.path.join(test_resources_path, "test_too_big_site.geojson"))
 
     # test site submission succeeds
     reporting_unit = client.submit_site(
         label="site 1",
         boundary_path=os.path.join(test_resources_path, "test_small_site.geojson"),
+        control_boundary_path=os.path.join(test_resources_path, "test_small_site.geojson"),
         description="test description",
         tags=['test'],
         dryrun=True,
