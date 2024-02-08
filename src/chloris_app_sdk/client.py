@@ -133,7 +133,7 @@ class ChlorisAppClient:
             response = self._get_cognito_idp_client().initiate_auth(
                 AuthFlow="REFRESH_TOKEN",
                 AuthParameters={"REFRESH_TOKEN": self.__refresh_token},
-                ClientId=self._aws_resources["awsUserPoolsWebClientId"],
+                ClientId=self._aws_resources["awsUserPoolWebClientId"],
             )
             self.__access_token = response["AuthenticationResult"]["AccessToken"]
             self.__id_token = response["AuthenticationResult"]["IdToken"]
@@ -301,7 +301,7 @@ class ChlorisAppClient:
             ),
         )
         if response.status != 200:
-            raise Exception(f"Failed to submit boundary for analysis: {response.status} {response.data.decode('utf-8')}")
+            raise Exception(f"Failed to submit boundary for normalization: {response.status} {response.data.decode('utf-8')}")
 
         # Poll S3 with exponential backoff up to 15 minutes for the boundary to be normalized
         boundary_path = self._wait_for_boundary_normalization(upload_id)
