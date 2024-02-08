@@ -606,9 +606,11 @@ class ChlorisAppClient:
         return json.loads(response.data.decode("utf-8"))
 
     def _get_data_path(self, reporting_unit_entry: Mapping[str, Any]) -> str:
-        data_path = reporting_unit_entry.get("dataPath").rstrip("/") + "/"
+        data_path = reporting_unit_entry.get("dataPath")
         if data_path is None:
             data_path = '/'.join([self.data_path.rstrip('/'), reporting_unit_entry['organizationId'], reporting_unit_entry['reportingUnitId'], ''])
+        else:
+            data_path = data_path.rstrip("/") + "/"
         if data_path.startswith("s3://"):
             data_path = data_path.replace("s3://chloris-app-data/data/", self.data_path)
         return data_path
