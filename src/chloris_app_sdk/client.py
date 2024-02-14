@@ -552,7 +552,7 @@ class ChlorisAppClient:
             if include_stats:
                 try:
                     stats = self.get_reporting_unit_stats(reporting_unit)
-                    # merge stats into reporting unit
+                    # merge stats into reporting unit (except for areaKm2, due to naming conflict)
                     reporting_unit = {**reporting_unit, **stats}
                 except Exception:
                     # ignore errors getting stats
@@ -603,7 +603,15 @@ class ChlorisAppClient:
         )
         if response.status != 200:
             raise Exception(f"Failed to get reporting unit stats: {response.status} {response.data.decode('utf-8')}")
-        return json.loads(response.data.decode("utf-8"))
+        result = json.loads(response.data.decode("utf-8"))
+        # Ensure "periodChangeStartYear" and "periodChangeEndYear" are integers
+        if isinstance(result.get("periodChangeStartYear"), str):
+            result["periodChangeStartYear"] = int(result["periodChangeStartYear"])
+        if isinstance(result.get("periodChangeEndYear"), str):
+            result["periodChangeEndYear"] = int(result["periodChangeEndYear"])
+        # remove areaKm2 due to naming conflict with the reporting unit vector area
+        result.pop("areaKm2", None)
+        return result
 
     def _get_data_path(self, reporting_unit_entry: Mapping[str, Any]) -> str:
         data_path = reporting_unit_entry.get("dataPath")
