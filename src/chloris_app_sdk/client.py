@@ -150,14 +150,24 @@ class ChlorisAppClient:
             self._cognito_idp_client = boto3.client("cognito-idp", config=Config(region_name=self._aws_resources["awsRegion"]))
         return self._cognito_idp_client
 
-    def _get_s3_client(self ) -> Any:
+    def _get_s3_client(self) -> Any:
         """
         Get the boto3 s3 client, creating it if needed.
 
         Returns: The boto3 s3 client.
         """
+        # check if the credentials are expired
+        if self._sts_credentials_expired():
+            self._s3_client = None
+        # get new client if needed
         if self._s3_client is None:
-            self._s3_client = boto3.client("s3", config=Config(region_name=self._aws_resources["awsRegion"]))
+            credentials = self._get_sts_temporary_credentials()
+            self._s3_client = boto3.client(
+                "s3",
+                aws_access_key_id=credentials["AccessKeyId"],
+                aws_secret_access_key=credentials["SecretKey"],
+                aws_session_token=credentials["SessionToken"],
+                config=Config(region_name=self._aws_resources["awsRegion"], ))
         return self._s3_client
 
     def _get_s3_bucket_resource(self) -> Any:
@@ -310,7 +320,6 @@ class ChlorisAppClient:
         return boundary_path
 
 
-
     def _upload_boundary_file(self, file: Union[str, os.PathLike], exclude_geometry_path: str = None) -> str:
         """
         Upload a geospatial boundary to the Chloris S3 bucket, and wait for it to be normalized.
@@ -344,7 +353,7 @@ class ChlorisAppClient:
         if not isinstance(file, str):
             file = str(file)
         if file.endswith(".shp"):
-            files =[]
+            files = []
             # if the file is a shapefile, upload all the files in the shapefile
             for shp_ext in [".dbf", ".prj", ".shx"]:
                 if os.path.exists(file.replace(".shp", shp_ext)):
@@ -442,7 +451,6 @@ class ChlorisAppClient:
         reporting_unit_entry.pop("downloads", None)
         reporting_unit_entry.pop("stats", None)
         reporting_unit_entry.pop("layersConfig", None)
-
         response = self._http_pool.request(
             "PUT",
             self.api_endpoint + f"reportingUnit",
