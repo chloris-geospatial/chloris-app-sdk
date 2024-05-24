@@ -34,6 +34,9 @@ pytest tests/test_utils.py
 
 # build the package
 python -m build
+
+# if you receive errors related to virualenv, try uninstalling it and re-installing it twice via `pip uninstall virtualenv` and then `pip install virtualenv`. This is a known issue pre-commit's virtualenv.
+
 # use docker to test the package in a clean environment
 docker run --rm -it -v $(pwd):/sdk python:3.9 bash
 cd /sdk

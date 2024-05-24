@@ -489,7 +489,7 @@ class ChlorisAppClient:
                 raise Exception(f"Failed to list reporting units: {response.status} {response.data.decode('utf-8')}")
             response_json = json.loads(response.data.decode("utf-8"))
             for reporting_unit in response_json.get("reportingUnits", []):
-                if reporting_unit.get("deleteAt") is None and reporting_unit.get("branchId") is None:
+                if reporting_unit.get("deletedAt") is None and reporting_unit.get("branchId") is None:
                     # Ensure "periodChangeStartYear" and "periodChangeEndYear" are integers
                     if isinstance(reporting_unit.get("periodChangeStartYear"), str):
                         reporting_unit["periodChangeStartYear"] = int(reporting_unit["periodChangeStartYear"])
@@ -522,7 +522,7 @@ class ChlorisAppClient:
                     "tags": [ "string", ... ],
                     "createdAt": "string",
                     "updatedAt": "string",
-                    "deleteAt": "string",
+                    "deletedAt": "string",
                     "controlReportingUnitId": {
                         "reportingUnitId": "string",
                         "label": "string",
@@ -571,7 +571,7 @@ class ChlorisAppClient:
                 except Exception:
                     # ignore errors getting layers config
                     pass
-            if include_downloads and reporting_unit.get("exportSubmittedAt") and reporting_unit.get("exportApprovedAt"):
+            if include_downloads:
                 try:
                     reporting_unit["downloads"] = self.get_reporting_unit_downloads(reporting_unit)
                 except Exception:
@@ -674,8 +674,6 @@ class ChlorisAppClient:
         if not (
             reporting_unit_entry.get("analysisCompletedAt")
             and reporting_unit_entry.get("qualityControlledAt")
-            and reporting_unit_entry.get("exportSubmittedAt")
-            and reporting_unit_entry.get("exportApprovedAt")
         ):
             # downloads not available, return early
             return None
