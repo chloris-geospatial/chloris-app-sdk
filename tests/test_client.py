@@ -24,7 +24,6 @@ def test_client() -> None:
     id_token = client._get_id_token()
     assert id_token is not None
     creds = client._get_sts_temporary_credentials()
-    # print(creds)
     assert creds is not None
     test_file = f"protected/{creds['IdentityId']}/{random.randint(0, 1000000)}_test.txt"
     client._upload_file(key=test_file, body="test")
