@@ -702,6 +702,8 @@ class ChlorisAppClient:
                     notify: Optional[bool] = True,
                     period_change_start_year: Optional[int] = None,
                     period_change_end_year: Optional[int] = None,
+                    resolution: Optional[int] = None,
+                    forest_baseline_year: Optional[int] = None,
                     **kwargs
                     ) -> Mapping[str, Any]:
         """A high-level function to submit a site to the Chloris App. Automatically chooses the best method to upload the boundary (geojson or S3 multipart upload).
@@ -715,6 +717,8 @@ class ChlorisAppClient:
             notify: Whether to send email notifications when the site is ready.
             period_change_start_year: The start of the period of interest
             period_change_end_year: The end of the period of interest (inclusive)
+            resolution: The desired resolution of the outputs. Valid options are 30 and 10 (meters). Defaults to 30.
+            forest_baseline_year: The year to use as the forest baseline year.
 
         Returns: The new reporting unit entry.
         """
@@ -764,6 +768,8 @@ class ChlorisAppClient:
                 "notify": notify,
                 "periodChangeStartYear": period_change_start_year,
                 "periodChangeEndYear": period_change_end_year,
+                "resolution": resolution,
+                "forestBaselineYear": forest_baseline_year,
                 **kwargs
             }
         )
