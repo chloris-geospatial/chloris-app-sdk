@@ -10,9 +10,12 @@ from botocore.exceptions import ClientError
 from urllib3 import PoolManager
 import boto3
 from .utils import is_token_expired
+import logging
 
 from botocore.config import Config
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("chloris_app_sdk.client")
 
 class ChlorisAppClient:
     """A client for interacting with the Chloris App API."""
@@ -206,21 +209,35 @@ class ChlorisAppClient:
         # check if the credentials are expired
         if self._sts_credentials_expired():
             self._sts_credentials = None
-        # get new credentials if needed
-        if self._sts_credentials is None:
-            try:
-                logins = {f"""cognito-idp.{self._aws_resources['awsRegion']}.amazonaws.com/{self._aws_resources['awsUserPoolId']}""": self._get_id_token()}
-                # Get the identity ID associated with the Cognito access token.
-                response = self._cognito_identity_client.get_id(IdentityPoolId=self._aws_resources["awsCognitoIdentityPoolId"], Logins=logins)
-                identity_id = response["IdentityId"]
-                # Get temporary STS credentials for the identity ID.
-                response = self._cognito_identity_client.get_credentials_for_identity(IdentityId=identity_id, Logins=logins)
-                # Extract the temporary credentials.
-                self._sts_credentials = response["Credentials"]
-                self._sts_credentials["IdentityId"] = identity_id
-            except Exception as ex:
-                # Handle any errors that may occur during the credential retrieval.
-                raise Exception("Failed to get temporary credentials for Chloris App") from ex
+        for i in range(12):
+            # get new credentials if needed
+            if self._sts_credentials is None:
+                try:
+                    logins = {f"""cognito-idp.{self._aws_resources['awsRegion']}.amazonaws.com/{self._aws_resources['awsUserPoolId']}""": self._get_id_token()}
+                    # Get the identity ID associated with the Cognito access token.
+                    response = self._cognito_identity_client.get_id(IdentityPoolId=self._aws_resources["awsCognitoIdentityPoolId"], Logins=logins)
+                    identity_id = response["IdentityId"]
+                    # Get temporary STS credentials for the identity ID.
+                    response = self._cognito_identity_client.get_credentials_for_identity(IdentityId=identity_id, Logins=logins)
+                    # Extract the temporary credentials.
+                    self._sts_credentials = response["Credentials"]
+                    self._sts_credentials["IdentityId"] = identity_id
+                    break
+                except Exception as ex:
+                    # Handle rate limiting by backing off,
+                    if "TooManyRequestsException" in str(ex):
+                        if i <= 5:
+                            logger.debug("Too many requests to Cognito, backing off.")
+                            sleep(2 ** i)
+                            continue
+                        elif i < 12:
+                            logger.warning("Too many requests to Cognito, backing off.")
+                            sleep(2 ** i)
+                            continue
+                        else:
+                            raise Exception("Too many requests to Cognito, please try again later.") from ex
+                    # Handle any errors that may occur during the credential retrieval.
+                    raise Exception("Failed to get temporary credentials for Chloris App") from ex
         return self._sts_credentials
 
     def _upload_file(
@@ -243,12 +260,22 @@ class ChlorisAppClient:
         """
         if metadata is None:
             metadata = {}
-        if body:
-            self._get_s3_bucket_resource().put_object(Body=body, Key=key, Metadata=metadata)
-        elif file_path:
-            self._get_s3_bucket_resource().upload_file(file_path, key, ExtraArgs={"Metadata": metadata})
-        else:
-            raise ValueError("Either body or file_path must be provided")
+        try:
+            if body:
+                self._get_s3_bucket_resource().put_object(Body=body, Key=key, Metadata=metadata)
+            elif file_path:
+                self._get_s3_bucket_resource().upload_file(file_path, key, ExtraArgs={"Metadata": metadata})
+            else:
+                raise ValueError("Either body or file_path must be provided")
+        except Exception as ex: # retry once for expired token during long upload
+            if "ExpiredToken" in str(ex):
+                if body:
+                    self._get_s3_bucket_resource().put_object(Body=body, Key=key, Metadata=metadata)
+                elif file_path:
+                    self._get_s3_bucket_resource().upload_file(file_path, key, ExtraArgs={"Metadata": metadata})
+                else:
+                    raise ValueError("Either body or file_path must be provided")
+
 
     def download_geojson_boundary(self, path):
         """
@@ -688,10 +715,13 @@ class ChlorisAppClient:
                 "Authorization": "Bearer " + self._get_id_token(),
             },
         )
+        # parse the response, otherwise return None when downloads are not available
         if response.status != 200:
-            # downloads not available.
             return None
-        return json.loads(response.data.decode("utf-8"))
+        try:
+            return json.loads(response.data.decode("utf-8"))
+        except json.JSONDecodeError:
+            return None
 
     def submit_site(self,
                     label: str,
