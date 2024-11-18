@@ -21,6 +21,7 @@ TEST_API = 'https://app-dev.chloris.earth/api/'
 def test_client() -> None:
     # requires CHLORIS_REFRESH_TOKEN env variable to be set, makes real calls to AWS
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
     id_token = client._get_id_token()
     assert id_token is not None
     creds = client._get_sts_temporary_credentials()
@@ -83,4 +84,18 @@ def test__get_sts_temporary_credentials():
     creds = client._get_sts_temporary_credentials()
 
     assert creds is not None
+    assert client._get_id_token() is not None
+
+def test_refresh_tokens():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    assert client._get_id_token() is not None
+
+    client.refresh_tokens()
+
+    assert client._get_id_token() is not None
+    assert client._get_sts_temporary_credentials() is not None
+
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
     assert client._get_id_token() is not None
