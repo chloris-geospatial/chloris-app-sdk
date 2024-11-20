@@ -2,7 +2,7 @@
 import os
 import uuid
 from time import sleep
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Mapping, Optional, Sequence, Union
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -14,7 +14,6 @@ import logging
 
 from botocore.config import Config
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("chloris_app_sdk.client")
 
 class ChlorisAppClient:
@@ -81,6 +80,10 @@ class ChlorisAppClient:
         # Ensure we have at least the id_token or refresh_token
         if self.__id_token is None and self.__refresh_token is None:
             raise ValueError("You must provide either an id_token or refresh_token. See help at: https://app.chloris.earth/docs/")
+        # Attempt to restore id token from cache
+        if self.__id_token is None and self.__refresh_token is not None:
+            self.__id_token = get_cached_id_token(self.__refresh_token)
+
         self._get_api_info()
 
         # attempt to get access token from refresh token
@@ -203,15 +206,14 @@ class ChlorisAppClient:
         Returns: The STS temporary credentials.
 
         """
-
         if self._cognito_identity_client is None:
             self._cognito_identity_client = boto3.client("cognito-identity", config=Config(region_name=self._aws_resources["awsRegion"]))
         # check if the credentials are expired
         if self._sts_credentials_expired():
             self._sts_credentials = None
-        for i in range(12):
             # get new credentials if needed
-            if self._sts_credentials is None:
+        if self._sts_credentials is None:
+            for i in range(12):
                 try:
                     logins = {f"""cognito-idp.{self._aws_resources['awsRegion']}.amazonaws.com/{self._aws_resources['awsUserPoolId']}""": self._get_id_token()}
                     # Get the identity ID associated with the Cognito access token.
