@@ -17,7 +17,7 @@ TEST_ORGANIZATION_ID = 'dev-0183c887-4cb1-752d-8767-d328337a4312'
 TEST_API = 'https://app-dev.chloris.earth/api/'
 
 
-# @pytest.mark.skip(reason="This is an integration-level test and makes real calls to AWS")
+
 def test_client() -> None:
     # requires CHLORIS_REFRESH_TOKEN env variable to be set, makes real calls to AWS
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
@@ -86,6 +86,7 @@ def test__get_sts_temporary_credentials():
     assert creds is not None
     assert client._get_id_token() is not None
 
+@pytest.mark.skipif(os.environ.get('CHLORIS_ID_TOKEN') is not None and os.environ.get('CHLORIS_REFRESH_TOKEN') is None, reason="requires refresh token")
 def test_refresh_tokens():
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
 

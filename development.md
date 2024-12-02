@@ -16,8 +16,8 @@ pip install -e .
 ## Testing
 
 ```bash
-# set CHLORIS_REFRESH_TOKEN env variable using valid credentials from app-dev.chloris.earth since tests make real calls to the API.
 
+# set CHLORIS_REFRESH_TOKEN env variable using valid credentials from app-dev.chloris.earth since tests make real calls to the API.
 export CHLORIS_REFRESH_TOKEN='TOKEN'
 
 # run all tests
@@ -26,6 +26,8 @@ pytest
 pytest tests/test_utils.py
 
 ```
+
+Note that setting CHLORIS_ID_TOKEN will run the same tests, except the test for refreshing tokens.
 
 ## Building / deploying the package
 
