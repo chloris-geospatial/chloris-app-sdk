@@ -80,9 +80,6 @@ class ChlorisAppClient:
         # Ensure we have at least the id_token or refresh_token
         if self.__id_token is None and self.__refresh_token is None:
             raise ValueError("You must provide either an id_token or refresh_token. See help at: https://app.chloris.earth/docs/")
-        # Attempt to restore id token from cache
-        if self.__id_token is None and self.__refresh_token is not None:
-            self.__id_token = get_cached_id_token(self.__refresh_token)
 
         self._get_api_info()
 
