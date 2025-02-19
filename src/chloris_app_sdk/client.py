@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from botocore.exceptions import ClientError
 from urllib3 import PoolManager
 import boto3
-from .utils import is_token_expired
+from .utils import is_token_expired, to_legacy_layers_config
 import logging
 
 from botocore.config import Config
@@ -685,7 +685,13 @@ class ChlorisAppClient:
         )
         if response.status != 200:
             raise Exception(f"Failed to get reporting unit layers config: {response.status} {response.data.decode('utf-8')}")
-        return json.loads(response.data.decode("utf-8"))
+        layers_config = json.loads(response.data.decode("utf-8"))
+        # Forwards-compatibility for new layers.json format
+        if layers_config.get('formatVersion') is not None:
+            logger.warning("The layers config structure has changed, please update to chloris-app-sdk 1.1.x or later and migrate your code. See https://app.chloris.earth/docs/1.9.0/changelog.html for more info.")
+            layers_config = to_legacy_layers_config(layers_config)
+        return layers_config
+
 
     def get_reporting_unit_downloads(self, reporting_unit_entry: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
         """
@@ -736,6 +742,8 @@ class ChlorisAppClient:
                     **kwargs
                     ) -> Mapping[str, Any]:
         """A high-level function to submit a site to the Chloris App. Automatically chooses the best method to upload the boundary (geojson or S3 multipart upload).
+
+        See https://app.chloris.earth/docs -> API Reference -> PUT /reportingUnit for additional parameters.
 
         Args:
             label: The label for the site.
