@@ -62,3 +62,31 @@ def to_tco2e(x: Optional[float]) -> Optional[float]:
     # binds to oxygen to form CO2, so we need to multiply by 44/12 to get the
     # CO2 equivalent.
     return x * 0.5 * (44 / 12)
+
+def to_legacy_layers_config(layers_config):
+    layers_list = layers_config.get('annualLayers', [])
+    layers_dict = dict()
+    for product_type, product_variant_template in (
+            ("stock", "dynamic-{resolution}m"),
+            ("stock", "static-{resolution}m"),
+            ("forest", "dynamic-{resolution}m"),
+            ("forest", "static-{resolution}m"),
+            ("change", "dynamic-{resolution}m-user-period"),
+            ("change", "static-{resolution}m-user-period"),
+            ("cumulative_change", "dynamic-{resolution}m-user-period"),
+            ("cumulative_change", "static-{resolution}m-user-period"),
+            ("forest_area_loss", "dynamic-{resolution}m-user-period"),
+            ("forest_area_loss", "static-{resolution}m-user-period"),
+            ("forest_area_gain", "dynamic-{resolution}m-user-period"),
+            ("forest_area_gain", "static-{resolution}m-user-period"),
+            ("forest_area_degradation", "dynamic-{resolution}m-user-period"),
+            ("forest_area_degradation", "static-{resolution}m-user-period"),
+    ):
+        for resolution in (10, 30):
+            product_variant = product_variant_template.format(resolution=resolution)
+            for _layer in layers_list:
+                if (_layer.get('productType') == product_type and
+                        _layer.get('resolution') == resolution and
+                        _layer.get('carbonPool') == "agb"):
+                    layers_dict.setdefault(product_type,{})[product_variant] = _layer
+    return layers_dict
