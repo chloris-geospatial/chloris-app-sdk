@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from botocore.exceptions import ClientError
 from urllib3 import PoolManager
 import boto3
-from .utils import is_token_expired, to_legacy_layers_config
+from .utils import is_token_expired
 import logging
 
 from botocore.config import Config
@@ -686,10 +686,6 @@ class ChlorisAppClient:
         if response.status != 200:
             raise Exception(f"Failed to get reporting unit layers config: {response.status} {response.data.decode('utf-8')}")
         layers_config = json.loads(response.data.decode("utf-8"))
-        # Forwards-compatibility for new layers.json format
-        if layers_config.get('formatVersion') is not None:
-            logger.warning("The layers config structure has changed, please update to chloris-app-sdk 1.1.x or later and migrate your code. See https://app.chloris.earth/docs/1.9.0/changelog.html for more info.")
-            layers_config = to_legacy_layers_config(layers_config)
         return layers_config
 
 
