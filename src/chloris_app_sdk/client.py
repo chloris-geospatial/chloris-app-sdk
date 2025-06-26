@@ -296,7 +296,7 @@ class ChlorisAppClient:
     def _sts_credentials_expired(self):
         return self._sts_credentials is not None and datetime.now(timezone.utc) > self._sts_credentials.get("Expiration", 0) - timedelta(minutes=10)
 
-    def _upload_boundary_remote_geojson(self, geojson_path: Union[str, os.PathLike], exclude_geometry_path: str = None) -> str:
+    def _upload_boundary_remote_geojson(self, geojson_path: Union[str, os.PathLike], exclude_geometry_path: str = None, **kwargs) -> str:
         """
         Upload a geojson boundary to the Chloris S3 bucket from a remote server or S3 bucket, and wait for it to be normalized.
 
@@ -333,6 +333,7 @@ class ChlorisAppClient:
                     "uploadId": upload_id,
                     "uploadPath": geojson_path,
                     "excludeGeometryPath": exclude_geometry_path,
+                    **kwargs
                 }
             ),
         )
@@ -346,12 +347,11 @@ class ChlorisAppClient:
         return boundary_path
 
 
-    def _upload_boundary_file(self, file: Union[str, os.PathLike], exclude_geometry_path: str = None) -> str:
+    def _upload_boundary_file(self, file: Union[str, os.PathLike], exclude_geometry_path: str = None, **kwargs) -> str:
         """
         Upload a geospatial boundary to the Chloris S3 bucket, and wait for it to be normalized.
 
-          Compared to `_upload_boundary_remote_geojson()`, this function is more flexible in the types of files
-          it can upload, but more applies stricter sparseness and complexity limits.
+        Compared to `_upload_boundary_remote_geojson()`, this function is more flexible in the types of files it can upload.
 
         Args:
             file: The geospatial boundary file to upload, for shapefile, just the path to the .shp.
@@ -387,7 +387,6 @@ class ChlorisAppClient:
             files.append(file)
         else:
             files = [file]
-
         # ensure that all the files exist
         for file in files:
             if not os.path.exists(file):
@@ -422,6 +421,7 @@ class ChlorisAppClient:
                     "uploadId": upload_id,
                     "uploadPath": f"s3://{self._aws_resources['awsUserFilesS3Bucket']}/{upload_key}",
                     "excludeGeometryPath": exclude_geometry_path,
+                    **kwargs,
                 }
             ),
         )
@@ -735,6 +735,7 @@ class ChlorisAppClient:
                     period_change_end_year: Optional[int] = None,
                     resolution: Optional[int] = None,
                     forest_baseline_year: Optional[int] = None,
+                    geometry_kwargs: Optional[Mapping[str, Any]] = {},
                     **kwargs
                     ) -> Mapping[str, Any]:
         """A high-level function to submit a site to the Chloris App. Automatically chooses the best method to upload the boundary (geojson or S3 multipart upload).
@@ -752,6 +753,7 @@ class ChlorisAppClient:
             period_change_end_year: The end of the period of interest (inclusive)
             resolution: The desired resolution of the outputs. Valid options are 30 and 10 (meters). Defaults to 30.
             forest_baseline_year: The year to use as the forest baseline year.
+            geometry_kwargs: Optional arguments to pass to the boundary upload process. Admins only.
 
         Returns: The new reporting unit entry.
         """
@@ -769,9 +771,9 @@ class ChlorisAppClient:
             raise ValueError("http urls not allowed when uploading from a remote server, please use https")
 
         if boundary_path.lower().startswith("https://"):
-            _boundary_path = self._upload_boundary_remote_geojson(boundary_path)
+            _boundary_path = self._upload_boundary_remote_geojson(boundary_path, **geometry_kwargs)
         else:
-            _boundary_path = self._upload_boundary_file(boundary_path)
+            _boundary_path = self._upload_boundary_file(boundary_path, **geometry_kwargs)
         if control_boundary_path is not None:
             if control_boundary_path.lower().startswith("https://"):
                 if control_boundary_path.lower().endswith(".geojson") or control_boundary_path.lower().endswith(".json"):
