@@ -42,7 +42,7 @@ python -m build
 # use docker to test the package in a clean environment
 docker run --rm -it -v $(pwd):/sdk python:3.9 bash
 cd /sdk
-pip install dist/chloris_app_sdk-1.0.11-py3-none-any.whl
+pip install dist/chloris_app_sdk-1.1.1-py3-none-any.whl
 python -c "from chloris_app_sdk import ChlorisAppClient; print(ChlorisAppClient)"
 
 
