@@ -4,7 +4,7 @@ The Chloris Platform Python SDK (_chloris-app-sdk_) is a Python package that pro
 
 See the [API documentation](https://app.chloris.earth/docs/index.html) for more information about the Chloris Platform API.
 
-See the [Python API reference](./docs/index.md) for the full list of functions and classes available in the SDK.
+See the [Python API reference](https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/docs/index.md) for the full list of functions and classes available in the SDK.
 
 ## Installation
 
