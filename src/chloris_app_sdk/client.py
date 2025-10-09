@@ -808,3 +808,28 @@ class ChlorisAppClient:
                 **kwargs
             }
         )
+
+    def put_collection(self, collection_entry: Mapping[str, Any]) -> Mapping[str, Any]:
+        """
+        Create or update a collection in the Chloris App.
+        Omit the reportingUnitId field to create a new collection.
+
+        Args:
+            collection_entry: The collection entry to create or update.
+
+        Returns: The new or updated collection.
+        """
+
+        response = self._http_pool.request(
+            "PUT",
+            self.api_endpoint + f"collection",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + self._get_id_token(),
+            },
+            body=json.dumps(collection_entry),
+        )
+        if response.status != 200:
+            raise Exception(f"Failed to create or update the collection: {response.status} {response.data.decode('utf-8')}")
+        # return the collection
+        return json.loads(response.data.decode("utf-8"))
