@@ -99,11 +99,11 @@ def test_delete_reporting_unit():
         notify=False,
     )
     reporting_unit_id = reporting_unit['reportingUnitId']
-    assert reporting_unit_id is not None
+    assert isinstance(reporting_unit_id, str) and len(reporting_unit_id) > 0
 
     # delete the site
     result = client.delete_reporting_unit(reporting_unit_id)
-    assert result is not None
+    assert 'deleted' in result['message'].lower()
 
     # verify the site is marked as deleted
     deleted_entry = client.get_reporting_unit(reporting_unit_id)
@@ -118,14 +118,14 @@ def test_delete_collection():
         "organizationId": TEST_ORGANIZATION_ID,
         "label": "collection to delete",
         "description": "test delete",
-        "collectionItems": [],
+        "reportingUnitIds": [],
     })
     reporting_unit_id = collection['reportingUnitId']
-    assert reporting_unit_id is not None
+    assert isinstance(reporting_unit_id, str) and len(reporting_unit_id) > 0
 
     # delete the collection
     result = client.delete_collection(reporting_unit_id)
-    assert result is not None
+    assert 'deleted' in result['message'].lower()
 
     # verify the collection is marked as deleted
     deleted_entry = client.get_reporting_unit(reporting_unit_id)
