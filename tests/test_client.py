@@ -86,6 +86,52 @@ def test__get_sts_temporary_credentials():
     assert creds is not None
     assert client._get_id_token() is not None
 
+def test_delete_reporting_unit():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    # create a dryrun site to delete
+    reporting_unit = client.submit_site(
+        label="site to delete",
+        boundary_path=os.path.join(test_resources_path, "test_small_site.geojson"),
+        description="test delete",
+        tags=['test'],
+        dryrun=True,
+        notify=False,
+    )
+    reporting_unit_id = reporting_unit['reportingUnitId']
+    assert isinstance(reporting_unit_id, str) and len(reporting_unit_id) > 0
+
+    # delete the site
+    result = client.delete_reporting_unit(reporting_unit_id)
+    assert 'deleted' in result['message'].lower()
+
+    # verify the site is marked as deleted
+    deleted_entry = client.get_reporting_unit(reporting_unit_id)
+    assert deleted_entry['deletedAt'] is not None
+
+
+def test_delete_collection():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    # create a collection to delete
+    collection = client.put_collection({
+        "organizationId": TEST_ORGANIZATION_ID,
+        "label": "collection to delete",
+        "description": "test delete",
+        "reportingUnitIds": [],
+    })
+    reporting_unit_id = collection['reportingUnitId']
+    assert isinstance(reporting_unit_id, str) and len(reporting_unit_id) > 0
+
+    # delete the collection
+    result = client.delete_collection(reporting_unit_id)
+    assert 'deleted' in result['message'].lower()
+
+    # verify the collection is marked as deleted
+    deleted_entry = client.get_reporting_unit(reporting_unit_id)
+    assert deleted_entry['deletedAt'] is not None
+
+
 @pytest.mark.skipif(os.environ.get('CHLORIS_ID_TOKEN') is not None and os.environ.get('CHLORIS_REFRESH_TOKEN') is None, reason="requires refresh token")
 def test_refresh_tokens():
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)

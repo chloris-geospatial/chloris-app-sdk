@@ -491,6 +491,29 @@ class ChlorisAppClient:
         # return the reporting unit entry
         return json.loads(response.data.decode("utf-8"))
 
+    def delete_reporting_unit(self, reporting_unit_id: str) -> Mapping[str, Any]:
+        """
+        Delete a reporting unit in the Chloris App. This is a soft delete that sets the deletedAt timestamp.
+        Restricted to organization administrators, owners, and managers.
+
+        Args:
+            reporting_unit_id: The id of the reporting unit to delete.
+
+        Returns: The API response message.
+        """
+        response = self._http_pool.request(
+            "DELETE",
+            self.api_endpoint + f"reportingUnit",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + self._get_id_token(),
+            },
+            body=json.dumps({"organizationId": self.organization_id, "reportingUnitId": reporting_unit_id}),
+        )
+        if response.status != 200:
+            raise Exception(f"Failed to delete reporting unit: {response.status} {response.data.decode('utf-8')}")
+        return json.loads(response.data.decode("utf-8"))
+
     def list_active_sites(self) -> Sequence[Mapping[str, Any]]:
         """
         List all active sites for the organization. This is a convenience function that filters the list of sites to only include active sites.
@@ -832,4 +855,26 @@ class ChlorisAppClient:
         if response.status != 200:
             raise Exception(f"Failed to create or update the collection: {response.status} {response.data.decode('utf-8')}")
         # return the collection
+        return json.loads(response.data.decode("utf-8"))
+
+    def delete_collection(self, reporting_unit_id: str) -> Mapping[str, Any]:
+        """
+        Delete a collection in the Chloris App. This is a soft delete that sets the deletedAt timestamp.
+
+        Args:
+            reporting_unit_id: The reportingUnitId of the collection to delete.
+
+        Returns: The API response message.
+        """
+        response = self._http_pool.request(
+            "DELETE",
+            self.api_endpoint + f"reportingUnit",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + self._get_id_token(),
+            },
+            body=json.dumps({"organizationId": self.organization_id, "reportingUnitId": reporting_unit_id}),
+        )
+        if response.status != 200:
+            raise Exception(f"Failed to delete collection: {response.status} {response.data.decode('utf-8')}")
         return json.loads(response.data.decode("utf-8"))
