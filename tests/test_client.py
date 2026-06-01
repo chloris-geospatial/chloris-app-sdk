@@ -105,9 +105,11 @@ def test_delete_reporting_unit():
     result = client.delete_reporting_unit(reporting_unit_id)
     assert 'deleted' in result['message'].lower()
 
-    # verify the site is marked as deleted
-    deleted_entry = client.get_reporting_unit(reporting_unit_id)
-    assert deleted_entry['deletedAt'] is not None
+    # verify the delete is persisted: a repeat delete is rejected as "already deleted".
+    # Using get_reporting_unit here would only work for admin callers because deleted
+    # entries are hidden from non-admins by the API's _redact_admin_data path.
+    result2 = client.delete_reporting_unit(reporting_unit_id)
+    assert 'already' in result2['message'].lower()
 
 
 def test_delete_collection():
@@ -127,9 +129,11 @@ def test_delete_collection():
     result = client.delete_collection(reporting_unit_id)
     assert 'deleted' in result['message'].lower()
 
-    # verify the collection is marked as deleted
-    deleted_entry = client.get_reporting_unit(reporting_unit_id)
-    assert deleted_entry['deletedAt'] is not None
+    # verify the delete is persisted: a repeat delete is rejected as "already deleted".
+    # Using get_reporting_unit here would only work for admin callers because deleted
+    # entries are hidden from non-admins by the API's _redact_admin_data path.
+    result2 = client.delete_collection(reporting_unit_id)
+    assert 'already' in result2['message'].lower()
 
 
 @pytest.mark.skipif(os.environ.get('CHLORIS_ID_TOKEN') is not None and os.environ.get('CHLORIS_REFRESH_TOKEN') is None, reason="requires refresh token")
