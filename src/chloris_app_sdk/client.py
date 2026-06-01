@@ -630,6 +630,8 @@ class ChlorisAppClient:
             reporting_units.append(reporting_unit)
 
         # link up the control site
+        if not reporting_units:
+            raise Exception(f"Reporting unit not found: {reporting_unit_id}")
         reporting_unit = reporting_units[0]
         if len(reporting_units) > 1:
             reporting_unit["controlReportingUnit"] = reporting_units[1]
