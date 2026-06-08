@@ -552,6 +552,64 @@ class ChlorisAppClient:
 
         return sites
 
+    def search_sites(
+        self,
+        label: str,
+        limit: int = 1000,
+        max_pages: int = 5,
+    ) -> Sequence[Mapping[str, Any]]:
+        """
+        Search active sites by label substring (case-sensitive).
+
+        Results are returned in the order the server provides them: completed sites
+        are sorted by analysisCompletedAt descending, with non-completed sites at the end.
+
+        Args:
+            label: Substring to match against site labels.
+            limit: Items scanned per page server-side, max 1000.
+            max_pages: Scan pages per request, max 50. Increase for sparse matches
+                in very large organizations.
+
+        Returns:
+            Matching reporting unit entries (excludes deleted sites and aggregation branches).
+        """
+        # use POST /api/reportingUnit with searchLabel and nextToken to load all matching sites
+        sites = []
+        next_token = None
+        while True:
+            response = self._http_pool.request(
+                "POST",
+                self.api_endpoint + f"reportingUnit",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + self._get_id_token(),
+                },
+                body=json.dumps({
+                    "organizationId": self.organization_id,
+                    "searchLabel": label,
+                    "limit": limit,
+                    "maxPages": max_pages,
+                    "nextToken": next_token,
+                }),
+            )
+            if response.status != 200:
+                raise Exception(f"Failed to search reporting units: {response.status} {response.data.decode('utf-8')}")
+            response_json = json.loads(response.data.decode("utf-8"))
+            for reporting_unit in response_json.get("reportingUnits", []):
+                if reporting_unit.get("deletedAt") is None and reporting_unit.get("branchId") is None:
+                    # Ensure "periodChangeStartYear" and "periodChangeEndYear" are integers
+                    if isinstance(reporting_unit.get("periodChangeStartYear"), str):
+                        reporting_unit["periodChangeStartYear"] = int(reporting_unit["periodChangeStartYear"])
+                    if isinstance(reporting_unit.get("periodChangeEndYear"), str):
+                        reporting_unit["periodChangeEndYear"] = int(reporting_unit["periodChangeEndYear"])
+
+                    sites.append(reporting_unit)
+            next_token = response_json.get("nextToken")
+            if next_token is None:
+                break
+
+        return sites
+
     def get_reporting_unit(self, reporting_unit_id: str, include_stats=False, include_layers_config=False, include_downloads=False) -> Mapping[str, Any]:
         """
         Get a site with its control (if it has one). Optionally also retrieving all stats, layers config, and downloads index.

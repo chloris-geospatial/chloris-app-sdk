@@ -64,6 +64,23 @@ def test_list_active_sites():
     assert len(reporting_units) > 0
 
 
+def test_search_sites():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    # derive a search substring from an existing site so the test is robust to fixture changes
+    active_sites = client.list_active_sites()
+    assert len(active_sites) > 0
+    full_label = active_sites[0]["label"]
+    # use the middle of the label to exercise substring (not just prefix) matching
+    substring = full_label[1:-1] if len(full_label) > 2 else full_label
+
+    results = client.search_sites(substring)
+
+    assert len(results) > 0
+    # every returned entry's label must contain the searched substring
+    assert all(substring in r.get("label", "") for r in results)
+
+
 def test_get_reporting_unit():
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
 
