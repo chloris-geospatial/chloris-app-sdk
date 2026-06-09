@@ -80,6 +80,20 @@ def test_search_sites():
     # every returned entry's label must contain the searched substring
     assert all(substring in r.get("label", "") for r in results)
 
+    # results are globally sorted by analysisCompletedAt descending (non-completed last)
+    sort_keys = [r.get("analysisCompletedAt") or "" for r in results]
+    assert sort_keys == sorted(sort_keys, reverse=True)
+
+
+def test_search_sites_empty_label_raises():
+    client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)
+
+    # an empty or whitespace-only label is rejected; use list_active_sites() for "everything"
+    with pytest.raises(ValueError):
+        client.search_sites("")
+    with pytest.raises(ValueError):
+        client.search_sites("   ")
+
 
 def test_get_reporting_unit():
     client = ChlorisAppClient(TEST_ORGANIZATION_ID, api_endpoint=TEST_API)

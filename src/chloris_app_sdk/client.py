@@ -572,7 +572,15 @@ class ChlorisAppClient:
 
         Returns:
             Matching reporting unit entries (excludes deleted sites and aggregation branches).
+
+        Raises:
+            ValueError: If label is empty or whitespace-only. Use list_active_sites()
+                to retrieve every site in the organization.
         """
+        if not label or not label.strip():
+            raise ValueError(
+                "label must be a non-empty string; use list_active_sites() to list all sites."
+            )
         # use POST /api/reportingUnit with searchLabel and nextToken to load all matching sites
         sites = []
         next_token = None
@@ -607,6 +615,12 @@ class ChlorisAppClient:
             next_token = response_json.get("nextToken")
             if next_token is None:
                 break
+
+        # The server sorts each page by analysisCompletedAt desc, but since we aggregate
+        # across nextToken pages we re-sort the full result set to preserve that ordering
+        # globally (completed sites newest-first; non-completed sites last). Matches the
+        # server's key: missing/empty analysisCompletedAt collates last under reverse=True.
+        sites.sort(key=lambda ru: ru.get("analysisCompletedAt") or "", reverse=True)
 
         return sites
 
