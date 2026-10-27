@@ -175,12 +175,32 @@ def test_put_reporting_unit_retries_502(_sleep):
 @mock.patch("chloris_app_sdk.client.sleep")
 def test_put_reporting_unit_gives_up_after_max_retries(_sleep):
     pool = mock.Mock()
-    pool.request.return_value = _response(502, {"message": "please retry"})
+    pool.request.return_value = _response(502, {"message": "The site could not be submitted for analysis; please retry"})
 
     with pytest.raises(Exception, match="502"):
         _offline_client(pool).put_reporting_unit({"label": "site"})
     # 1 initial attempt + 3 retries
     assert pool.request.call_count == 4
+
+
+@mock.patch("chloris_app_sdk.client.sleep")
+def test_put_reporting_unit_does_not_retry_gateway_502(_sleep):
+    pool = mock.Mock()
+    pool.request.return_value = _response(502, {"message": "Internal server error"})
+
+    with pytest.raises(Exception, match="502"):
+        _offline_client(pool).put_reporting_unit({"label": "site"})
+    assert pool.request.call_count == 1
+
+
+@mock.patch("chloris_app_sdk.client.sleep")
+def test_put_reporting_unit_does_not_retry_502_with_allow_duplicate(_sleep):
+    pool = mock.Mock()
+    pool.request.return_value = _response(502, {"message": "The site could not be submitted for analysis; please retry"})
+
+    with pytest.raises(Exception, match="502"):
+        _offline_client(pool).put_reporting_unit({"label": "site", "allowDuplicate": True})
+    assert pool.request.call_count == 1
 
 
 @mock.patch("chloris_app_sdk.client.sleep")
