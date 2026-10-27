@@ -16,6 +16,11 @@ from botocore.config import Config
 
 logger = logging.getLogger("chloris_app_sdk.client")
 
+# number of times to retry a 502 from PUT /reportingUnit (site not submitted and rolled back)
+_PUT_REPORTING_UNIT_MAX_RETRIES = 3
+# the handler's own 502; API Gateway also returns 502 (Internal server error) for an unhandled Lambda error
+_RETRYABLE_502_MESSAGE = b"could not be submitted for analysis"
+
 class ChlorisAppClient:
     """A client for interacting with the Chloris App API."""
 
@@ -309,6 +314,8 @@ class ChlorisAppClient:
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
+            It is purged after 30 days if no site references it, and the raw upload also expires after 30 days,
+            so submit the site soon rather than reusing an old path.
 
         """
         if not isinstance(geojson_path, str):
@@ -359,6 +366,8 @@ class ChlorisAppClient:
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
+            It is purged after 30 days if no site references it, and the raw upload also expires after 30 days,
+            so submit the site soon rather than reusing an old path.
 
         Raises:
             ValueError: If there is an issue with the boundary
@@ -466,10 +475,29 @@ class ChlorisAppClient:
         """
         Create or update a reporting unit in the Chloris App.
 
+        Errors are raised with the status code in the message:
+
+        - 409: a site with the same label, resolution and area already exists in the organization.
+          Admins can pass `allowDuplicate=True`. Dryrun sites are exempt.
+        - 403: `bypassAnalysis=True` was passed by a non-admin.
+        - 502 "could not be submitted for analysis": the site was not submitted and was rolled back. This is
+          retried automatically up to 3 times with exponential backoff, except for `allowDuplicate` or
+          `calibratedFrom` entries. If the first attempt's job may still be running, its site is kept and the
+          retry raises a 409 naming it, and that site will still be analyzed.
+        - Any other 502 (e.g. "Internal server error") is raised without retrying, since the site may already
+          exist. Check `list_active_sites()` before resubmitting.
+
+        Other errors are not retried.
+
         Args:
-            reporting_unit_entry: The reporting unit entry to create or update.
+            reporting_unit_entry: The reporting unit entry to create or update. A normalized `boundaryPath`
+                is purged after 30 days if no site references it, so submit soon after uploading
+                rather than reusing an old path.
 
         Returns: The new reporting unit entry.
+
+        Raises:
+            Exception: If the API rejects the request (see the status codes above).
         """
         # clone the reporting unit entry
         reporting_unit_entry = dict(reporting_unit_entry)
@@ -477,15 +505,30 @@ class ChlorisAppClient:
         reporting_unit_entry.pop("downloads", None)
         reporting_unit_entry.pop("stats", None)
         reporting_unit_entry.pop("layersConfig", None)
-        response = self._http_pool.request(
-            "PUT",
-            self.api_endpoint + f"reportingUnit",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + self._get_id_token(),
-            },
-            body=json.dumps(reporting_unit_entry),
-        )
+        # a site kept from a failed attempt makes the retry a 409 through the duplicate guard, which
+        # allowDuplicate and calibratedFrom skip, so those would create a second site instead
+        retry_502 = not reporting_unit_entry.get("allowDuplicate") and not reporting_unit_entry.get("calibratedFrom")
+        attempt = 0
+        while True:
+            response = self._http_pool.request(
+                "PUT",
+                self.api_endpoint + f"reportingUnit",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + self._get_id_token(),
+                },
+                body=json.dumps(reporting_unit_entry),
+            )
+            # only the handler's own 502 means the site was not submitted; any other 502 may follow a saved site
+            retryable = retry_502 and response.status == 502 and _RETRYABLE_502_MESSAGE in response.data
+            if not retryable or attempt >= _PUT_REPORTING_UNIT_MAX_RETRIES:
+                break
+            attempt += 1
+            delay = 5 * (2 ** (attempt - 1))  # exponential backoff: 5s, 10s, 20s
+            logger.warning(
+                f"Site submission returned 502, retrying in {delay}s ({attempt}/{_PUT_REPORTING_UNIT_MAX_RETRIES})"
+            )
+            sleep(delay)
         if response.status != 200:
             raise Exception(f"Failed to create or update reporting unit: {response.status} {response.data.decode('utf-8')}")
         # return the reporting unit entry
@@ -851,8 +894,16 @@ class ChlorisAppClient:
             resolution: The desired resolution of the outputs. Valid options are 30 and 10 (meters). Defaults to 30.
             forest_baseline_year: The year to use as the forest baseline year.
             geometry_kwargs: Optional arguments to pass to the boundary upload process. Admins only.
+                Set `simplifyGeometry=False` to keep the uploaded geometry unsmoothed.
+                `sparseConvexHullPercentLimit` and `sparseBboxPercentLimit` must be numbers from 0 to 1.
+                Wrong types or out-of-range values are rejected with a 400 from `POST /boundary`.
 
         Returns: The new reporting unit entry.
+
+        Raises:
+            Exception: If the API rejects the boundary or the site. The status codes are listed
+                in `put_reporting_unit()`. A 502 saying the site could not be submitted is retried
+                automatically up to 3 times.
         """
 
         # First we upload the primary boundary, then the control boundary (if provided), then we submit the site.

@@ -9,12 +9,12 @@ This is the primary module of the chloris-app-sdk.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L19"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L24"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ## <kbd>class</kbd> `ChlorisAppClient`
 A client for interacting with the Chloris App API. 
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L22"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L27"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -47,7 +47,7 @@ Create a new client with the given authentication parameters.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L934"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L985"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `delete_collection`
 
@@ -67,7 +67,7 @@ Returns: The API response message.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L494"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L537"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `delete_reporting_unit`
 
@@ -87,7 +87,7 @@ Returns: The API response message.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L279"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L284"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `download_geojson_boundary`
 
@@ -110,7 +110,7 @@ Download a GeoJSON boundary from the user data bucket
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L627"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L670"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `get_reporting_unit`
 
@@ -153,7 +153,7 @@ Get a site with its control (if it has one). Optionally also retrieving all stat
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L789"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L832"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `get_reporting_unit_downloads`
 
@@ -178,7 +178,7 @@ Get the downloads index for a site, if available.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L761"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L804"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `get_reporting_unit_layers_config`
 
@@ -203,7 +203,7 @@ Get the layers config for a site.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L713"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L756"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `get_reporting_unit_stats`
 
@@ -228,7 +228,7 @@ Get the stats for a site.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L517"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L560"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `list_active_sites`
 
@@ -245,7 +245,7 @@ List all active sites for the organization. This is a convenience function that 
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L909"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L960"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `put_collection`
 
@@ -265,7 +265,7 @@ Returns: The new or updated collection.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L465"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L474"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `put_reporting_unit`
 
@@ -275,17 +275,33 @@ put_reporting_unit(reporting_unit_entry: Mapping[str, Any]) → Mapping[str, Any
 
 Create or update a reporting unit in the Chloris App. 
 
+Errors are raised with the status code in the message: 
+
+
+- 409: a site with the same label, resolution and area already exists in the organization.  Admins can pass `allowDuplicate=True`. Dryrun sites are exempt. 
+- 403: `bypassAnalysis=True` was passed by a non-admin. 
+- 502 "could not be submitted for analysis": the site was not submitted and was rolled back. This is  retried automatically up to 3 times with exponential backoff, except for `allowDuplicate` or  `calibratedFrom` entries. If the first attempt's job may still be running, its site is kept and the  retry raises a 409 naming it, and that site will still be analyzed. 
+- Any other 502 (e.g. "Internal server error") is raised without retrying, since the site may already  exist. Check `list_active_sites()` before resubmitting. 
+
+Other errors are not retried. 
+
 
 
 **Args:**
  
- - <b>`reporting_unit_entry`</b>:  The reporting unit entry to create or update. 
+ - <b>`reporting_unit_entry`</b>:  The reporting unit entry to create or update. A normalized `boundaryPath`  is purged after 30 days if no site references it, so submit soon after uploading  rather than reusing an old path. 
 
 Returns: The new reporting unit entry. 
 
+
+
+**Raises:**
+ 
+ - <b>`Exception`</b>:  If the API rejects the request (see the status codes above). 
+
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L131"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L136"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `refresh_tokens`
 
@@ -297,7 +313,7 @@ Refresh the id and access tokens using the refresh token.
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L555"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L598"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `search_sites`
 
@@ -334,7 +350,7 @@ Results are returned in the order the server provides them: completed sites are 
 
 ---
 
-<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L824"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
+<a href="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/src/chloris_app_sdk/client.py#L867"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
 ### <kbd>method</kbd> `submit_site`
 
@@ -373,8 +389,14 @@ See https://app.chloris.earth/docs -> API Reference -> PUT /reportingUnit for ad
  - <b>`period_change_end_year`</b>:  The end of the period of interest (inclusive) 
  - <b>`resolution`</b>:  The desired resolution of the outputs. Valid options are 30 and 10 (meters). Defaults to 30. 
  - <b>`forest_baseline_year`</b>:  The year to use as the forest baseline year. 
- - <b>`geometry_kwargs`</b>:  Optional arguments to pass to the boundary upload process. Admins only. 
+ - <b>`geometry_kwargs`</b>:  Optional arguments to pass to the boundary upload process. Admins only.  Set `simplifyGeometry=False` to keep the uploaded geometry unsmoothed.  `sparseConvexHullPercentLimit` and `sparseBboxPercentLimit` must be numbers from 0 to 1.  Wrong types or out-of-range values are rejected with a 400 from `POST /boundary`. 
 
 Returns: The new reporting unit entry. 
+
+
+
+**Raises:**
+ 
+ - <b>`Exception`</b>:  If the API rejects the boundary or the site. The status codes are listed  in `put_reporting_unit()`. A 502 saying the site could not be submitted is retried  automatically up to 3 times. 
 
 
