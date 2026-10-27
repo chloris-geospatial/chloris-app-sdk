@@ -3,6 +3,7 @@ import random
 import pytest
 
 import os
+from unittest import mock
 
 # workaround to import from src directory
 import sys
@@ -141,6 +142,55 @@ def test_delete_reporting_unit():
     # entries are hidden from non-admins by the API's _redact_admin_data path.
     result2 = client.delete_reporting_unit(reporting_unit_id)
     assert 'already deleted' in result2['message'].lower()
+
+
+def _offline_client(http_pool):
+    # skip __init__ so no network calls or tokens are needed
+    client = ChlorisAppClient.__new__(ChlorisAppClient)
+    client._http_pool = http_pool
+    client.api_endpoint = TEST_API
+    client.organization_id = TEST_ORGANIZATION_ID
+    client._get_id_token = lambda: "token"
+    return client
+
+
+def _response(status, body):
+    return mock.Mock(status=status, data=json.dumps(body).encode("utf-8"))
+
+
+@mock.patch("chloris_app_sdk.client.sleep")
+def test_put_reporting_unit_retries_502(_sleep):
+    pool = mock.Mock()
+    pool.request.side_effect = [
+        _response(502, {"message": "The site could not be submitted for analysis; please retry"}),
+        _response(200, {"reportingUnitId": "abc"}),
+    ]
+
+    result = _offline_client(pool).put_reporting_unit({"label": "site"})
+
+    assert result["reportingUnitId"] == "abc"
+    assert pool.request.call_count == 2
+
+
+@mock.patch("chloris_app_sdk.client.sleep")
+def test_put_reporting_unit_gives_up_after_max_retries(_sleep):
+    pool = mock.Mock()
+    pool.request.return_value = _response(502, {"message": "please retry"})
+
+    with pytest.raises(Exception, match="502"):
+        _offline_client(pool).put_reporting_unit({"label": "site"})
+    # 1 initial attempt + 3 retries
+    assert pool.request.call_count == 4
+
+
+@mock.patch("chloris_app_sdk.client.sleep")
+def test_put_reporting_unit_does_not_retry_409(_sleep):
+    pool = mock.Mock()
+    pool.request.return_value = _response(409, {"message": "duplicate site"})
+
+    with pytest.raises(Exception, match="409"):
+        _offline_client(pool).put_reporting_unit({"label": "site"})
+    assert pool.request.call_count == 1
 
 
 def test_delete_collection():

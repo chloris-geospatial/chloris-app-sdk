@@ -16,6 +16,9 @@ from botocore.config import Config
 
 logger = logging.getLogger("chloris_app_sdk.client")
 
+# number of times to retry a 502 from PUT /reportingUnit (site not submitted and rolled back)
+_PUT_REPORTING_UNIT_MAX_RETRIES = 3
+
 class ChlorisAppClient:
     """A client for interacting with the Chloris App API."""
 
@@ -309,6 +312,8 @@ class ChlorisAppClient:
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
+            It is purged after 30 days if no site references it, and the raw upload also expires after 30 days,
+            so submit the site soon rather than reusing an old path.
 
         """
         if not isinstance(geojson_path, str):
@@ -359,6 +364,8 @@ class ChlorisAppClient:
 
         Returns:
             The S3 path to the normalized boundary, to be used when submitting a new site.
+            It is purged after 30 days if no site references it, and the raw upload also expires after 30 days,
+            so submit the site soon rather than reusing an old path.
 
         Raises:
             ValueError: If there is an issue with the boundary
@@ -466,10 +473,25 @@ class ChlorisAppClient:
         """
         Create or update a reporting unit in the Chloris App.
 
+        Errors are raised with the status code in the message:
+
+        - 409: a site with the same label, resolution and area already exists in the organization.
+          Admins can pass `allowDuplicate=True`. Dryrun sites are exempt.
+        - 403: `bypassAnalysis=True` was passed by a non-admin.
+        - 502: the site was not submitted for analysis and was rolled back. This is retried automatically
+          up to 3 times with exponential backoff before raising, and is safe to retry later.
+
+        Other errors are not retried.
+
         Args:
-            reporting_unit_entry: The reporting unit entry to create or update.
+            reporting_unit_entry: The reporting unit entry to create or update. A normalized `boundaryPath`
+                is purged after 30 days if no site references it, so submit soon after uploading
+                rather than reusing an old path.
 
         Returns: The new reporting unit entry.
+
+        Raises:
+            Exception: If the API rejects the request (see the status codes above).
         """
         # clone the reporting unit entry
         reporting_unit_entry = dict(reporting_unit_entry)
@@ -477,15 +499,26 @@ class ChlorisAppClient:
         reporting_unit_entry.pop("downloads", None)
         reporting_unit_entry.pop("stats", None)
         reporting_unit_entry.pop("layersConfig", None)
-        response = self._http_pool.request(
-            "PUT",
-            self.api_endpoint + f"reportingUnit",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + self._get_id_token(),
-            },
-            body=json.dumps(reporting_unit_entry),
-        )
+        attempt = 0
+        while True:
+            response = self._http_pool.request(
+                "PUT",
+                self.api_endpoint + f"reportingUnit",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + self._get_id_token(),
+                },
+                body=json.dumps(reporting_unit_entry),
+            )
+            # 502 means the pipeline did not take the job and the site was rolled back, so a retry is a clean create
+            if response.status != 502 or attempt >= _PUT_REPORTING_UNIT_MAX_RETRIES:
+                break
+            attempt += 1
+            delay = 5 * (2 ** (attempt - 1))  # exponential backoff: 5s, 10s, 20s
+            logger.warning(
+                f"Site submission returned 502, retrying in {delay}s ({attempt}/{_PUT_REPORTING_UNIT_MAX_RETRIES})"
+            )
+            sleep(delay)
         if response.status != 200:
             raise Exception(f"Failed to create or update reporting unit: {response.status} {response.data.decode('utf-8')}")
         # return the reporting unit entry
@@ -851,8 +884,15 @@ class ChlorisAppClient:
             resolution: The desired resolution of the outputs. Valid options are 30 and 10 (meters). Defaults to 30.
             forest_baseline_year: The year to use as the forest baseline year.
             geometry_kwargs: Optional arguments to pass to the boundary upload process. Admins only.
+                Set `simplifyGeometry=False` to keep the uploaded geometry unsmoothed.
+                `sparseConvexHullPercentLimit` and `sparseBboxPercentLimit` must be numbers from 0 to 1.
+                Wrong types or out-of-range values are rejected with a 400 from `POST /boundary`.
 
         Returns: The new reporting unit entry.
+
+        Raises:
+            Exception: If the API rejects the boundary or the site. The status codes are listed
+                in `put_reporting_unit()`. A 502 is retried automatically up to 3 times.
         """
 
         # First we upload the primary boundary, then the control boundary (if provided), then we submit the site.
