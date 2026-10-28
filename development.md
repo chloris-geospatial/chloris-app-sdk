@@ -31,23 +31,33 @@ Note that setting CHLORIS_ID_TOKEN will run the same tests, except the test for 
 
 ## Building / deploying the package
 
+Every release needs a new version. PyPI rejects a version that already exists, so bump `version` in setup.cfg in an MR to `main` first, then build from the merged `main`.
+
 ```bash
-# consider updating the version in setup.cfg
+# start from the merged main containing the version bump
+git checkout main && git pull
+
+# remove artifacts from earlier builds so only the new version is uploaded
+rm -rf dist build src/*.egg-info
 
 # build the package
 python -m build
+twine check dist/*
 
 # if you receive errors related to virualenv, try uninstalling it and re-installing it twice via `pip uninstall virtualenv` and then `pip install virtualenv`. This is a known issue pre-commit's virtualenv.
 
 # use docker to test the package in a clean environment
 docker run --rm -it -v $(pwd):/sdk python:3.9 bash
 cd /sdk
-pip install dist/chloris_app_sdk-1.2.0-py3-none-any.whl
+pip install dist/chloris_app_sdk-*-py3-none-any.whl
 python -c "from chloris_app_sdk import ChlorisAppClient; print(ChlorisAppClient)"
 
 
-# upload the package to pypi
-twine upload --skip-existing dist/*
+# upload the package to pypi. Without --skip-existing, a forgotten version bump fails loudly instead of publishing nothing.
+twine upload dist/*
+
+# tag the released commit
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 ### Updating the API documentation
@@ -57,3 +67,5 @@ The API documentation is generated from the docstrings in the code using [lazydo
 ```bash
 lazydocs --output-path="./docs/" --overview-file="index.md" --src-base-url="https://github.com/chloris-geospatial/chloris-app-sdk/blob/main/" --no-watermark ./src/
 ```
+
+lazydocs needs Python 3.11 or earlier. On 3.12+ it fails to import the modules and writes an `index.md` listing "No modules", so check that `docs/index.md` still lists the modules before committing.
